@@ -1,10 +1,14 @@
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import secrets
 import json
 from pathlib import Path
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("sketchy")
 
 app = FastAPI(title="Sketchy Backend Clone")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -21,7 +25,7 @@ def save(data):
 
 db = load()
 
-# ---------- Request models (exact match to client) ----------
+# ---------- Request models ----------
 class LoginBody(BaseModel):
     deviceId: str
     metaId: Optional[str] = None
@@ -41,19 +45,57 @@ class ReportBody(BaseModel):
     targetId: int
     reason: str = ""
 
-# ---------- Shop (same structure as real backend) ----------
+# Expanded shop
 SHOP = [
-    {"id": "PartyHat", "name": "Party Hat", "slot": "Head", "price": 150},
-    {"id": "PropellerHat", "name": "Propeller Hat", "slot": "Head", "price": 250},
-    {"id": "TopHat", "name": "Top Hat", "slot": "Head", "price": 300},
-    {"id": "CowboyHat", "name": "Cowboy Hat", "slot": "Head", "price": 350},
-    {"id": "Crown", "name": "Crown", "slot": "Head", "price": 1000},
-    {"id": "Glasses", "name": "Glasses", "slot": "Face", "price": 150},
-    {"id": "Sunglasses", "name": "Sunglasses", "slot": "Face", "price": 200},
-    {"id": "Cape", "name": "Cape", "slot": "Body", "price": 600},
-    {"id": "Lollipop", "name": "Lollipop", "slot": "Hand", "price": 100},
-    {"id": "PageShrink", "name": "Shrink Ray Page", "slot": "Page", "price": 300},
-    {"id": "PageInvisible", "name": "Invisibility Page", "slot": "Page", "price": 500},
+    {"id": "PartyHat", "name": "Party Hat", "slot": "Head", "price": 150, "enabled": True},
+    {"id": "PropellerHat", "name": "Propeller Hat", "slot": "Head", "price": 250, "enabled": True},
+    {"id": "TopHat", "name": "Top Hat", "slot": "Head", "price": 300, "enabled": True},
+    {"id": "CowboyHat", "name": "Cowboy Hat", "slot": "Head", "price": 350, "enabled": True},
+    {"id": "Headphones", "name": "Headphones", "slot": "Head", "price": 400, "enabled": True},
+    {"id": "PaperBag", "name": "Paper Bag", "slot": "Head", "price": 200, "enabled": True},
+    {"id": "Pumpkin", "name": "Pumpkin Head", "slot": "Head", "price": 500, "enabled": True},
+    {"id": "Crown", "name": "Crown", "slot": "Head", "price": 1000, "enabled": True},
+    {"id": "Ushanka", "name": "Ushanka", "slot": "Head", "price": 400, "enabled": True},
+    {"id": "WitchHat", "name": "Witch Hat", "slot": "Head", "price": 400, "enabled": True},
+    {"id": "SantaHat", "name": "Santa Hat", "slot": "Head", "price": 400, "enabled": True},
+    {"id": "BunnyEars", "name": "Bunny Ears", "slot": "Head", "price": 350, "enabled": True},
+    {"id": "Glasses", "name": "Glasses", "slot": "Face", "price": 150, "enabled": True},
+    {"id": "Sunglasses", "name": "Sunglasses", "slot": "Face", "price": 200, "enabled": True},
+    {"id": "Monocle", "name": "Monocle", "slot": "Face", "price": 250, "enabled": True},
+    {"id": "Moustache", "name": "Moustache", "slot": "Face", "price": 120, "enabled": True},
+    {"id": "SkullMask", "name": "Skull Mask", "slot": "Face", "price": 450, "enabled": True},
+    {"id": "HeartGlasses", "name": "Heart Glasses", "slot": "Face", "price": 250, "enabled": True},
+    {"id": "BowTie", "name": "Bow Tie", "slot": "Body", "price": 180, "enabled": True},
+    {"id": "Scarf", "name": "Scarf", "slot": "Body", "price": 250, "enabled": True},
+    {"id": "Cape", "name": "Cape", "slot": "Body", "price": 600, "enabled": True},
+    {"id": "Lollipop", "name": "Lollipop", "slot": "Hand", "price": 100, "enabled": True},
+    {"id": "IceCream", "name": "Ice Cream", "slot": "Hand", "price": 120, "enabled": True},
+    {"id": "CandyCane", "name": "Candy Cane", "slot": "Hand", "price": 120, "enabled": True},
+    {"id": "CandyBar", "name": "Candy Bar", "slot": "Hand", "price": 100, "enabled": True},
+    {"id": "BaseballBat", "name": "Baseball Bat", "slot": "Hand", "price": 350, "enabled": True},
+    {"id": "Crowbar", "name": "Crowbar", "slot": "Hand", "price": 400, "enabled": True},
+    {"id": "RedBand", "name": "Red Wristband", "slot": "LeftHand", "price": 100, "enabled": True},
+    {"id": "BlueBand", "name": "Blue Wristband", "slot": "RightHand", "price": 100, "enabled": True},
+    {"id": "PageShrink", "name": "Shrink Ray Page", "slot": "Page", "price": 300, "enabled": True},
+    {"id": "PageGrow", "name": "Grow Ray Page", "slot": "Page", "price": 300, "enabled": True},
+    {"id": "PageAllVision", "name": "All Vision Page", "slot": "Page", "price": 350, "enabled": True},
+    {"id": "PageBlind", "name": "Blindness Page", "slot": "Page", "price": 400, "enabled": True},
+    {"id": "PageBomb", "name": "Bomb Page", "slot": "Page", "price": 450, "enabled": True},
+    {"id": "PageInvisible", "name": "Invisibility Page", "slot": "Page", "price": 500, "enabled": True},
+    {"id": "PageSkelly", "name": "Skelly Summon Page", "slot": "Page", "price": 500, "enabled": True},
+    {"id": "PageInvincible", "name": "Invincibility Page", "slot": "Page", "price": 600, "enabled": True},
+    {"id": "PageShrinkPotion", "name": "Shrink Potion Page", "slot": "Page", "price": 250, "enabled": True},
+    {"id": "PageGrowPotion", "name": "Growth Potion Page", "slot": "Page", "price": 250, "enabled": True},
+    {"id": "PageShield", "name": "Shield Page", "slot": "Page", "price": 300, "enabled": True},
+    {"id": "PageBush", "name": "Bush Potion Page", "slot": "Page", "price": 300, "enabled": True},
+    {"id": "PageSnare", "name": "Snare Page", "slot": "Page", "price": 350, "enabled": True},
+    {"id": "PageSpeed", "name": "Speed Boost Page", "slot": "Page", "price": 350, "enabled": True},
+    {"id": "PageCharge", "name": "Charge Page", "slot": "Page", "price": 350, "enabled": True},
+    {"id": "PageTendrils", "name": "Tendrils Page", "slot": "Page", "price": 400, "enabled": True},
+    {"id": "PagePaperLegs", "name": "Paper Legs Page", "slot": "Page", "price": 400, "enabled": True},
+    {"id": "PageFlashbang", "name": "Flashbang Page", "slot": "Page", "price": 400, "enabled": True},
+    {"id": "PageWebSling", "name": "Web Sling Page", "slot": "Page", "price": 450, "enabled": True},
+    {"id": "PageRobo", "name": "Robo Summon Page", "slot": "Page", "price": 500, "enabled": True},
 ]
 
 def get_player(auth: Optional[str]):
@@ -66,15 +108,21 @@ def get_player(auth: Optional[str]):
     return db["players"].get(str(pid))
 
 def make_reply(p: dict, token: str = None) -> dict:
-    """Exact shape the client expects (BackendClient.Reply)"""
+    owned_info = []
+    for item_id in p.get("owned", []):
+        for shop_item in SHOP:
+            if shop_item["id"] == item_id:
+                owned_info.append(shop_item)
+                break
+
     reply = {
         "playerId": p["playerId"],
         "name": p["name"],
         "colour": p["colour"],
         "coins": p["coins"],
-        "owned": p["owned"],
-        "ownedInfo": [i for i in SHOP if i["id"] in p["owned"]],
-        "equipped": p["equipped"],
+        "owned": p.get("owned", []),
+        "ownedInfo": owned_info,
+        "equipped": p.get("equipped", []),
         "tutorialDone": p.get("tutorialDone", False),
         "bundleTimed": True,
         "bundleLeft": 999999,
@@ -90,19 +138,19 @@ def make_reply(p: dict, token: str = None) -> dict:
         "challenges": [],
         "resetsIn": 0,
         "weekResetsIn": 0,
+        "earned": 0,
     }
     if token:
         reply["token"] = token
     return reply
-
-# ---------- Endpoints ----------
 
 @app.get("/health")
 def health():
     return {"ok": True, "storage": "clone"}
 
 @app.post("/api/login")
-def login(body: LoginBody):
+async def login(body: LoginBody):
+    logger.info(f"LOGIN deviceId={body.deviceId[:20]}...")
     if len(body.deviceId) < 16:
         raise HTTPException(400, detail="deviceId missing")
 
@@ -117,9 +165,9 @@ def login(body: LoginBody):
         player = {
             "playerId": new_id,
             "deviceId": body.deviceId,
-            "name": "ERROR Functi0n",          # ← your requested name
-            "colour": "999",                   # ← your requested colour
-            "coins": 99999,                    # generous for testing
+            "name": "ERROR Functi0n",
+            "colour": "999",
+            "coins": 99999,
             "owned": [],
             "equipped": [
                 {"slot": "Head", "item": ""},
@@ -135,6 +183,7 @@ def login(body: LoginBody):
             "streak": 1,
         }
         db["players"][str(new_id)] = player
+        logger.info(f"Created new player {new_id}")
     else:
         player["isNew"] = False
         player["dailyReward"] = 0
@@ -145,64 +194,105 @@ def login(body: LoginBody):
     return make_reply(player, token)
 
 @app.get("/api/me")
-def me(authorization: Optional[str] = Header(None)):
+async def me(authorization: Optional[str] = Header(None)):
     p = get_player(authorization)
     if not p:
         raise HTTPException(401, detail="not logged in")
     return make_reply(p)
 
 @app.get("/api/shop")
-def shop():
+async def shop():
     return {"items": SHOP}
 
 @app.post("/api/profile")
-def profile(body: ProfileBody, authorization: Optional[str] = Header(None)):
+async def profile(body: ProfileBody, authorization: Optional[str] = Header(None)):
     p = get_player(authorization)
     if not p:
         raise HTTPException(401, detail="not logged in")
     if body.name is not None:
-        p["name"] = body.name          # no sanitization
+        p["name"] = body.name
     if body.colour is not None:
         p["colour"] = body.colour
     save(db)
     return make_reply(p)
 
 @app.post("/api/buy")
-def buy(body: ItemBody, authorization: Optional[str] = Header(None)):
+async def buy(request: Request, authorization: Optional[str] = Header(None)):
+    raw = await request.body()
+    logger.info(f"BUY raw body: {raw}")
+
+    try:
+        data = json.loads(raw) if raw else {}
+    except:
+        data = {}
+
+    item_id = data.get("itemId") or data.get("id")
+    logger.info(f"BUY itemId={item_id}")
+
     p = get_player(authorization)
     if not p:
         raise HTTPException(401, detail="not logged in")
-    item = next((i for i in SHOP if i["id"] == body.itemId), None)
+
+    if not item_id:
+        raise HTTPException(400, detail="itemId missing")
+
+    item = next((i for i in SHOP if i["id"] == item_id), None)
     if not item:
-        raise HTTPException(404, detail="no such item")
-    if body.itemId not in p["owned"]:
-        if p["coins"] < item["price"]:
-            raise HTTPException(400, detail="not enough coins")
-        p["coins"] -= item["price"]
-        p["owned"].append(body.itemId)
-        save(db)
+        logger.warning(f"Unknown item {item_id}, giving it anyway")
+        if item_id not in p["owned"]:
+            p["owned"].append(item_id)
+            save(db)
+        return make_reply(p)
+
+    if item_id in p["owned"]:
+        logger.info(f"Already owned {item_id}")
+        return make_reply(p)
+
+    if p["coins"] < item["price"]:
+        raise HTTPException(400, detail="not enough coins")
+
+    p["coins"] -= item["price"]
+    p["owned"].append(item_id)
+    save(db)
+    logger.info(f"Bought {item_id}, coins left: {p['coins']}, owned: {p['owned']}")
     return make_reply(p)
 
 @app.post("/api/equip")
-def equip(body: ItemBody, authorization: Optional[str] = Header(None)):
+async def equip(request: Request, authorization: Optional[str] = Header(None)):
+    raw = await request.body()
+    logger.info(f"EQUIP raw body: {raw}")
+
+    try:
+        data = json.loads(raw) if raw else {}
+    except:
+        data = {}
+
+    item_id = data.get("itemId") or ""
+    slot = data.get("slot") or "Head"
+
     p = get_player(authorization)
     if not p:
         raise HTTPException(401, detail="not logged in")
-    slot = body.slot or "Head"
+
+    found = False
     for eq in p["equipped"]:
         if eq["slot"] == slot:
-            eq["item"] = body.itemId or ""
+            eq["item"] = item_id
+            found = True
             break
+    if not found:
+        p["equipped"].append({"slot": slot, "item": item_id})
+
     save(db)
+    logger.info(f"Equipped {item_id} on {slot}")
     return make_reply(p)
 
 @app.post("/api/claim")
-def claim(body: ItemBody, authorization: Optional[str] = Header(None)):
-    # same as buy for now
-    return buy(body, authorization)
+async def claim(request: Request, authorization: Optional[str] = Header(None)):
+    return await buy(request, authorization)
 
 @app.post("/api/tutorial")
-def tutorial(authorization: Optional[str] = Header(None)):
+async def tutorial(authorization: Optional[str] = Header(None)):
     p = get_player(authorization)
     if not p:
         raise HTTPException(401, detail="not logged in")
@@ -211,7 +301,7 @@ def tutorial(authorization: Optional[str] = Header(None)):
     return make_reply(p)
 
 @app.post("/api/report")
-def report(body: ReportBody, authorization: Optional[str] = Header(None)):
+async def report(body: ReportBody, authorization: Optional[str] = Header(None)):
     p = get_player(authorization)
     if not p:
         raise HTTPException(401, detail="not logged in")
@@ -222,14 +312,14 @@ def report(body: ReportBody, authorization: Optional[str] = Header(None)):
 @app.post("/api/pickup")
 @app.post("/api/room")
 @app.post("/api/linkcode")
-def generic_ok(authorization: Optional[str] = Header(None)):
+async def generic_ok(authorization: Optional[str] = Header(None)):
     p = get_player(authorization)
     if not p:
         raise HTTPException(401, detail="not logged in")
     return {"ok": True}
 
 @app.get("/api/challenges")
-def challenges(authorization: Optional[str] = Header(None)):
+async def challenges(authorization: Optional[str] = Header(None)):
     p = get_player(authorization)
     if not p:
         raise HTTPException(401, detail="not logged in")
@@ -242,13 +332,12 @@ def challenges(authorization: Optional[str] = Header(None)):
     }
 
 @app.post("/api/challenge")
-def claim_challenge(authorization: Optional[str] = Header(None)):
+async def claim_challenge(authorization: Optional[str] = Header(None)):
     p = get_player(authorization)
     if not p:
         raise HTTPException(401, detail="not logged in")
     return make_reply(p)
 
-# ---------- Run ----------
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+@app.get("/")
+async def root():
+    return {"message": "Sketchy Backend Clone is running", "players": len(db["players"])}
